@@ -1,0 +1,81 @@
+\documentclass[a4paper]{scrreprt}
+\usepackage{graphicx}
+\usepackage{titlepic}
+\usepackage{subfig}
+\usepackage{titling}
+\usepackage[a4paper,left=3.5cm,right=2cm,top=2cm,bottom=2cm]{geometry}
+\usepackage{helvet}
+\usepackage{natbib}
+\usepackage[breaklinks]{hyperref}
+\usepackage{rotating}
+% \usepackage{lscape}
+\usepackage{pdfpages}
+\usepackage{setspace}
+\usepackage{subfiles}
+% \renewcommand\thefigure{\arabic{figure}}
+% \setcounter{figure}{0}
+\setcounter{chapter}{0}
+\newcommand*{\urlprefix}{Available at: }
+\newcommand*{\urldateprefix}{Accessed }
+\setcitestyle{notesep={: }}
+\bibliographystyle{bib/BCU.bst}
+\doublespacing
+
+\begin{document}
+\title{{LoRaWAN} Gateways as Remote Access Servers: \\ Designing a secure remote access solution for \\ branch office network devices}
+\author{Luke Dominic Tainton \\ 16114711}
+
+{\fontfamily{phv}\selectfont
+
+\begin{titlingpage}
+\newgeometry{left=2cm,right=2cm,top=2cm,bottom=2cm}
+\begin{center}
+\includegraphics[width=10cm]{img/cover/bcu.png} \\
+\vspace{0.5cm}
+\begin{large}
+Birmingham City University \\
+School of Computing and Digital Technology \\
+Bachelor of Science with Honours Computer Networks \\
+\end{large}
+\vspace{4cm}
+\begin{large}
+\textbf{\thetitle} \\
+Final Year Project Dissertation \\
+\end{large}
+\vspace{1cm}
+\theauthor\\[0.2cm]
+\date{June 2020}
+\vspace{1cm}
+A report submitted as part of the requirements for the degree of BSc (Hons) \\ Computer Networks at the School of Computing and Digital Technology, \\ Birmingham City University. \\
+\vspace{1cm}
+\thedate \\
+\vspace{1cm}
+\textbf{Supervisor:} Dalia El-Banna \\
+\vspace{1cm}
+% \thedate \\
+\vspace{1cm}
+\end{center}
+\end{titlingpage}
+
+\newgeometry{left=3.5cm,right=2cm,top=2cm,bottom=2cm}
+\newpage
+\chapter*{Abstract}
+\subfile{sections/0-1-abstract}
+
+\chapter*{Acknowledgements}
+\subfile{sections/0-2-acknowledgements}
+
+\newpage
+\tableofcontents
+\listoffigures
+
+\subfile{sections}
+
+\newpage
+\addcontentsline{toc}{chapter}{Bibliography}
+\raggedright
+\nocite{*} % List all references
+\bibliography{bib/bibliography.bib}
+
+} % end font
+\end{document}

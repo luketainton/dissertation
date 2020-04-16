@@ -1,0 +1,34 @@
+To ensure that the design of the new out-of-band management solution fit the needs not only of Multi-Tech but of the industry in general, research was conducted using literature that was related to the following set of four topics:
+\begin{itemize}
+    \item How is out-of-band management defined and why is it used?
+    \item What types of out-of band management are there?
+    \item What are the functionality issues?
+    \item What are the security issues?
+\end{itemize}
+The review of this literature will emphasise the reasons why out-of-band management systems are used in industry, the different forms in which they appear, and the positive and negative effects of using such systems to manage networks ranging from small businesses to large global enterprises. \\\\
+This review, and therefore the report as a whole, will take research centred around "in-band' management into account, but will not go into any depth analysing it as it is beyond the scope of the project. While large-scale out-of-band networks were not originally in the scope of this project, a lack of available research on branch office out-of-band management systems required that the scope of the research phase be expanded to include this.
+
+\section{Definition of out-of-band management}
+\label{section:lit-definition}
+All industry experts and academics define out-of-band management in a similar manner, as a separate, parallel network that grants engineers remote access to managed devices. However, most articles are focused on a specific use for the technology and therefore define it specifically for their use case; \cite{1606042} added specifics for managing military networks, whereas \cite{211239} described it in a way more related to managing servers in a data centre.
+
+\section{Types of out-of band management}
+\label{section:lit-types}
+Most research into out-of-band management systems was focused on rack-mount servers and virtual machines instead of networking devices such as switches and routers. This is likely due to disaster recovery methods for networks being well defined, even if they are poorly documented. \\\\
+Where research was focused on network out-of-band management, it was aimed at large enterprises which have the capability to deploy large, scalable dedicated networks for their out-of-band facility. There was a lack of research into small business and branch office management using modems, which is the main focus for this project. \\\\
+Out of band networks, while functionally the same between use cases, will be physically different from each other dependant on the types of system they are connecting to. As an example, \cite{cisco-ha} uses console servers in their out-of-band network to access the console of network devices using a serial connection. In contrast, \cite{pruett_bladecenter_2005} uses IBM's \textit{BladeCenter} software to manage a blade chassis remotely via a web GUI. 
+
+\section{Functionality issues}
+\label{section:lit-functionality}
+As stated by Multi-Tech in section \ref{section:appendix-proposal}, the main functionality issue that is present in this method of out-of-band device management is the ability for an administrator to accidentally place the modem into command mode, rendering the connection unusable until someone can physically power cycle the modem. \\\\
+There is a lack of research into this area, both in academic journals and online. While there is no clear reason as to why this is, it is possible that this issue is specific to Multi-Tech's solution and there are no wider functional issues that would warrant investigation.
+
+\section{Security issues}
+\label{section:lit-security}
+Most journals mentioned the failings of Telnet in terms of keeping management traffic secure, with some suggesting workarounds and alternative methods of accessing the intended device. \cite{geant-bpd-101} provide an example of this in their best practice document published by the pan-European research network GÉANT, where they detail Telnet's non-encrypted nature and suggest that secure shell (SSH) is used instead; \cite{1274255} suggests using TLS as an encryption layer to Telnet instead of SSH, which would essentially achieve the same result. \\\\
+Many network administrators mitigate these issues by segmenting management traffic from the main production network \citep{auvik-oobm-network}. This network can be physically separate, or run on the same physical hardware but be separated logically. \cite{plixer-vrf} suggests a method of logical separation involving VLANs at Layer 2 and VRFs at Layer 3, and explains the differences between them.
+\begin{itemize}
+    \item \textcolor{red}{Network ACLs \citep{geant-bpd-101}}
+    \item \textcolor{red}{SNMP - polling vs. traps \citep{386580}}
+    \item \textcolor{red}{Mention in all sub-sections}
+\end{itemize}

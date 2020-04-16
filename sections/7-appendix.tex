@@ -1,0 +1,547 @@
+\section{Multi-Tech project proposal}
+\label{section:appendix-proposal}
+\subsection{Scope}
+Many companies still use analogue modems for out-of-band management for devices such as Cisco routers and telephone systems so they can have management companies (or themselves) dial into remote locations to make changes. This is then a protected connection as it does not necessitate use of the internal network to access the hardware. The modems they traditionally use is the Multi-Tech MT9234ZBA analogue modem. \\\\
+Accessing Cisco routers though a console port is known to have some issues:
+\begin{itemize}
+    \item Escape sequences can be passed to the device through data uploads, that can put modems into command mode (breaking the connection to a non-recoverable state without power cycling the modem)
+    \item The modem generates characters when a remote device connects, that can put a Cisco router in to command mode.
+\end{itemize}
+The Multi-Tech MT9234ZBA modem is going end of life, and along with it some built in features to protect against the above. The entire solution is now end of life, including the legacy chips inside, with no replacement options from any manufacturer. 
+
+\subsection{Proposed solution}
+There is a potential ‘older’ solution that could be re-engineered - the RAS or remote access server. Using Multi-Tech Conduit gateways:
+\begin{itemize}
+    \item Build a RAS application into the gateway
+    \item Attach two serial ports to it (Accessory cards) you could attach a still manufactured modem to one port – giving RAS dial in access and an IP connection.
+    \item With the IP connection, you could then enable a terminal to the second serial port and whatever terminal is connected to it (like a Cisco router), thus recovering out of band management capabilities via the requested analogue phone lines with a secured connection (username and password in the RAS) and separation from the terminal.
+\end{itemize}
+This could then be offered as an alternative solution to the customer base that will soon have no alternative.
+
+\section{Configuration: /etc/sudoers}
+\label{section:appendix-sudoers}
+\begin{verbatim}
+## sudoers file.
+##
+## This file MUST be edited with the 'visudo' command as root.
+## Failure to use 'visudo' may result in syntax or file permission errors
+## that prevent sudo from running.
+##
+## See the sudoers man page for the details on how to write a sudoers file.
+##
+
+##
+## Host alias specification
+##
+## Groups of machines. These may include host names (optionally with wildcards),
+## IP addresses, network numbers or netgroups.
+# Host_Alias	WEBSERVERS = www1, www2, www3
+
+##
+## User alias specification
+##
+## Groups of users.  These may consist of user names, uids, Unix groups,
+## or netgroups.
+# User_Alias	ADMINS = millert, dowdy, mikef
+
+##
+## Cmnd alias specification
+##
+## Groups of commands.  Often used to group related commands together.
+# Cmnd_Alias	PROCESSES = /usr/bin/nice, /bin/kill, /usr/bin/renice, \
+# 			    /usr/bin/pkill, /usr/bin/top
+# Cmnd_Alias	REBOOT = /sbin/halt, /sbin/reboot, /sbin/poweroff
+
+##
+## Defaults specification
+##
+## You may wish to keep some of the following environment variables
+## when running commands via sudo.
+##
+## Locale settings
+# Defaults env_keep += "LANG LANGUAGE LINGUAS LC_* _XKB_CHARSET"
+##
+## Run X applications through sudo; HOME is used to find the
+## .Xauthority file.  Note that other programs use HOME to find
+## configuration files and this may lead to privilege escalation!
+# Defaults env_keep += "HOME"
+##
+## X11 resource path settings
+# Defaults env_keep += "XAPPLRESDIR XFILESEARCHPATH XUSERFILESEARCHPATH"
+##
+## Desktop path settings
+# Defaults env_keep += "QTDIR KDEDIR"
+##
+## Allow sudo-run commands to inherit the callers' ConsoleKit session
+# Defaults env_keep += "XDG_SESSION_COOKIE"
+##
+## Uncomment to enable special input methods.  Care should be taken as
+## this may allow users to subvert the command being run via sudo.
+# Defaults env_keep += "XMODIFIERS GTK_IM_MODULE QT_IM_MODULE QT_IM_SWITCHER"
+##
+## Uncomment to use a hard-coded PATH instead of the user's to find commands
+Defaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+##
+## Uncomment to send mail if the user does not enter the correct password.
+# Defaults mail_badpass
+##
+## Uncomment to enable logging of a command's output, except for
+## sudoreplay and reboot.  Use sudoreplay to play back logged sessions.
+# Defaults log_output
+# Defaults!/usr/bin/sudoreplay !log_output
+# Defaults!/usr/local/bin/sudoreplay !log_output
+# Defaults!REBOOT !log_output
+
+##
+## Runas alias specification
+##
+
+##
+## User privilege specification
+##
+root ALL=(ALL) ALL
+
+## Uncomment to allow members of group wheel to execute any command
+# %wheel ALL=(ALL) ALL
+
+## Same thing without a password
+# %wheel ALL=(ALL) NOPASSWD: ALL
+
+## Uncomment to allow members of group sudo to execute any command
+%sudo	ALL=(ALL) ALL
+
+## OOBM
+%sudo	ALL=(ALL:ALL) NOPASSWD: /usr/sbin/mts-io-sysfs
+%oobm	ALL=(ALL:ALL) NOPASSWD: /usr/sbin/mts-io-sysfs
+
+## Uncomment to allow any user to run sudo if they know the password
+## of the user they are running the command as (root by default).
+# Defaults targetpw  # Ask for the password of the target user
+# ALL ALL=(ALL) ALL  # WARNING: only use this together with 'Defaults targetpw'
+
+## Read drop-in files from /etc/sudoers.d
+## (the '#' here does not indicate a comment)
+#includedir /etc/sudoers.d
+\end{verbatim}
+
+\section{Configuration: /etc/init.d/sshd-oobm}
+\label{section:appendix-sshdoobminitd}
+\begin{verbatim}
+#! /bin/sh
+set -e
+
+PIDFILE=/var/run/sshd-oobm.pid
+CONFFILE=/etc/ssh/sshd_oobm_config
+
+# source function library
+. /etc/init.d/functions
+
+# /etc/init.d/sshd-oobm: start and stop the OpenBSD "secure shell" daemon for OOBM
+
+test -x /usr/sbin/sshd || exit 0
+( /usr/sbin/sshd -\? 2>&1 | grep -q OpenSSH ) 2>/dev/null || exit 0
+
+# /etc/default/ssh may set SYSCONFDIR and SSHD_OPTS
+if test -f /etc/default/ssh; then
+    . /etc/default/ssh
+fi
+
+[ -z "$SYSCONFDIR" ] && SYSCONFDIR=/etc/ssh
+mkdir -p $SYSCONFDIR
+
+HOST_KEY_RSA=$SYSCONFDIR/ssh_host_rsa_key
+HOST_KEY_DSA=$SYSCONFDIR/ssh_host_dsa_key
+HOST_KEY_ECDSA=$SYSCONFDIR/ssh_host_ecdsa_key
+HOST_KEY_ED25519=$SYSCONFDIR/ssh_host_ed25519_key
+
+check_for_no_start() {
+    # forget it if we're trying to start, and /etc/ssh/sshd_oobm_not_to_be_run exists
+    if [ -e $SYSCONFDIR/sshd_oobm_not_to_be_run ]; then
+        echo "OpenBSD Secure Shell server for OOBM not in use"
+        exit 0
+    fi
+}
+
+check_privsep_dir() {
+    # Create the PrivSep empty dir if necessary
+    if [ ! -d /var/run/sshd-oobm ]; then
+        mkdir /var/run/sshd-oobm
+        chmod 0755 /var/run/sshd-oobm
+    fi
+}
+
+check_config() {
+    /usr/sbin/sshd -t $SSHD_OPTS || exit 1
+}
+
+check_keys() {
+    # create keys if necessary
+    if [ ! -f $HOST_KEY_RSA ]; then
+        echo "  generating ssh RSA key..."
+        ssh-keygen -q -f $HOST_KEY_RSA -N '' -t rsa
+    fi
+    if [ ! -f $HOST_KEY_ECDSA ]; then
+        echo "  generating ssh ECDSA key..."
+        ssh-keygen -q -f $HOST_KEY_ECDSA -N '' -t ecdsa
+    fi
+    if [ ! -f $HOST_KEY_DSA ]; then
+        echo "  generating ssh DSA key..."
+        ssh-keygen -q -f $HOST_KEY_DSA -N '' -t dsa
+    fi
+    if [ ! -f $HOST_KEY_ED25519 ]; then
+        echo "  generating ssh ED25519 key..."
+        ssh-keygen -q -f $HOST_KEY_ED25519 -N '' -t ed25519
+    fi
+}
+
+export PATH="${PATH:+$PATH:}/usr/sbin:/sbin"
+
+case "$1" in
+    start)
+        check_for_no_start
+        echo "Starting OOBM server"
+        check_keys
+        check_privsep_dir
+        start-stop-daemon -S -p $PIDFILE --make-pidfile --startas /usr/sbin/sshd \
+        -- -f $CONFFILE $SSHD_OPTS
+        echo "done."
+    ;;
+    stop)
+        echo -n "Stopping OOBM server"
+        pidno1=$(<$PIDFILE)
+        pidno=$((pidno1 + 1))
+        kill $pidno
+        echo "."
+    ;;
+    reload|force-reload|restart)
+        check_for_no_start
+        check_keys
+        check_config
+        echo -n "Reloading OOBM server configuration"
+        /etc/init.d/sshd-oobm stop
+        /etc/init.d/sshd-oobm start
+        echo "."
+    ;;
+    status)
+        pidno1=$(<$PIDFILE)
+        pidno=$((pidno1 + 1))
+        if ps -p $pidno > /dev/null
+        then
+            echo "OOBM server ($pidno) is running"
+        else
+            echo "OOBM server is not running"
+        fi
+        exit $?
+    ;;
+    *)
+        echo "Usage: /etc/init.d/ssh-oobm {start|stop|status|reload \
+        |force-reload|restart}"
+        exit 1
+esac
+exit 0
+\end{verbatim}
+
+\section{Configuration: /etc/ssh/sshd\_banner}
+\label{section:appendix-ssh-sshdbanner}
+\begin{verbatim}
+#####################
+# MultiTech Conduit #
+#  LoRaWAN Gateway  #
+#####################
+
+MODE: Remote Gateway Management
+\end{verbatim}
+
+\section{Configuration: /etc/ssh/sshd\_oobm\_banner}
+\label{section:appendix-ssh-sshdoodbmbanner}
+\begin{verbatim}
+#####################
+# MultiTech Conduit #
+#  LoRaWAN Gateway  #
+#####################
+
+MODE: Out of Band Management service
+\end{verbatim}
+
+\section{Configuration: /etc/ssh/sshd\_config}
+\label{section:appendix-ssh-sshdconfig}
+\begin{verbatim}
+#	$OpenBSD: sshd_config,v 1.80 2008/07/02 02:24:18 djm Exp $
+
+# This is the sshd server system-wide configuration file.  See
+# sshd_config(5) for more information.
+
+# This sshd was compiled with PATH=/usr/bin:/bin:/usr/sbin:/sbin
+
+# The strategy used for options in the default sshd_config shipped with
+# OpenSSH is to specify options with their default value where
+# possible, but leave them commented.  Uncommented options change a
+# default value.
+
+#Port 22
+#AddressFamily any
+#ListenAddress 0.0.0.0
+#ListenAddress ::
+
+# The default requires explicit activation of protocol 1
+Protocol 2
+
+# HostKey for protocol version 1
+#HostKey /etc/ssh/ssh_host_key
+# HostKeys for protocol version 2
+#HostKey /etc/ssh/ssh_host_rsa_key
+#HostKey /etc/ssh/ssh_host_dsa_key
+#HostKey /etc/ssh/ssh_host_ecdsa_key
+#HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Lifetime and size of ephemeral version 1 server key
+#KeyRegenerationInterval 1h
+#ServerKeyBits 1024
+
+# Ciphers and keying
+#RekeyLimit default none
+
+# Logging
+# obsoletes QuietMode and FascistLogging
+#SyslogFacility AUTH
+#LogLevel INFO
+
+# Authentication:
+#LoginGraceTime 2m
+#PermitRootLogin yes
+#StrictModes yes
+#MaxAuthTries 6
+#MaxSessions 10
+
+#RSAAuthentication yes
+#PubkeyAuthentication yes
+
+# The default is to check both .ssh/authorized_keys and .ssh/authorized_keys2
+# but this is overridden so installations will only check .ssh/authorized_keys
+AuthorizedKeysFile .ssh/authorized_keys
+
+#AuthorizedPrincipalsFile none
+
+#AuthorizedKeysCommand none
+#AuthorizedKeysCommandUser nobody
+
+# For this to work you will also need host keys in /etc/ssh/ssh_known_hosts
+#RhostsRSAAuthentication no
+# similar for protocol version 2
+#HostbasedAuthentication no
+# Change to yes if you don't trust ~/.ssh/known_hosts for
+# RhostsRSAAuthentication and HostbasedAuthentication
+#IgnoreUserKnownHosts no
+# Don't read the user's ~/.rhosts and ~/.shosts files
+#IgnoreRhosts yes
+
+# To disable tunneled clear text passwords, change to no here!
+#PasswordAuthentication yes
+#PermitEmptyPasswords no
+
+# Change to no to disable s/key passwords
+ChallengeResponseAuthentication no
+
+# Kerberos options
+#KerberosAuthentication no
+#KerberosOrLocalPasswd yes
+#KerberosTicketCleanup yes
+#KerberosGetAFSToken no
+
+# GSSAPI options
+#GSSAPIAuthentication no
+#GSSAPICleanupCredentials yes
+
+# Set this to 'yes' to enable PAM authentication, account processing,
+# and session processing. If this is enabled, PAM authentication will
+# be allowed through the ChallengeResponseAuthentication and
+# PasswordAuthentication.  Depending on your PAM configuration,
+# PAM authentication via ChallengeResponseAuthentication may bypass
+# the setting of "PermitRootLogin without-password".
+# If you just want the PAM account and session checks to run without
+# PAM authentication, then enable this but set PasswordAuthentication
+# and ChallengeResponseAuthentication to 'no'.
+UsePAM yes
+
+#AllowAgentForwarding yes
+#AllowTcpForwarding yes
+#GatewayPorts no
+X11Forwarding yes
+#X11DisplayOffset 10
+#X11UseLocalhost yes
+#PermitTTY yes
+#PrintMotd yes
+#PrintLastLog yes
+#TCPKeepAlive yes
+#UseLogin no
+UsePrivilegeSeparation sandbox # Default for new installations.
+#PermitUserEnvironment no
+Compression no
+ClientAliveInterval 15
+ClientAliveCountMax 4
+#UseDNS yes
+#PidFile /var/run/sshd.pid
+#MaxStartups 10:30:100
+#PermitTunnel no
+#ChrootDirectory none
+#VersionAddendum none
+
+# no default banner path
+Banner /etc/ssh/sshd_banner
+
+# override default of no subsystems
+Subsystem	sftp	/usr/libexec/sftp-server
+
+# Example of overriding settings on a per-user basis
+#Match User anoncvs
+#	X11Forwarding no
+#	AllowTcpForwarding no
+#	PermitTTY no
+#	ForceCommand cvs server
+\end{verbatim}
+
+\section{Configuration: /etc/ssh/sshd\_oobm\_config}
+\label{section:appendix-ssh-sshdoobmconfig}
+\begin{verbatim}
+#	$OpenBSD: sshd_config,v 1.80 2008/07/02 02:24:18 djm Exp $
+
+# This is the sshd server OOBM configuration file.
+
+############################
+# CONNECTIVITY             #
+############################
+Port 1024
+#AddressFamily any
+#ListenAddress 0.0.0.0
+#ListenAddress ::
+
+# The default requires explicit activation of protocol 1
+Protocol 2
+
+# HostKey for protocol version 1
+#HostKey /etc/ssh/ssh_host_key
+# HostKeys for protocol version 2
+#HostKey /etc/ssh/ssh_host_rsa_key
+#HostKey /etc/ssh/ssh_host_dsa_key
+#HostKey /etc/ssh/ssh_host_ecdsa_key
+#HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Lifetime and size of ephemeral version 1 server key
+#KeyRegenerationInterval 1h
+#ServerKeyBits 1024
+
+# Ciphers and keying
+#RekeyLimit default none
+
+############################
+# LOGGING                  #
+############################
+SyslogFacility AUTH
+LogLevel INFO
+
+############################
+# AUTHENTICATION           #
+############################
+AllowGroups oobm
+ForceCommand /etc/ssh/sshd_oobm_cmd
+
+#LoginGraceTime 2m
+#PermitRootLogin yes
+#StrictModes yes
+#MaxAuthTries 6
+#MaxSessions 10
+
+#RSAAuthentication yes
+#PubkeyAuthentication yes
+
+# The default is to check both .ssh/authorized_keys and .ssh/authorized_keys2
+# but this is overridden so installations will only check .ssh/authorized_keys
+AuthorizedKeysFile .ssh/authorized_keys
+
+#AuthorizedPrincipalsFile none
+
+#AuthorizedKeysCommand none
+#AuthorizedKeysCommandUser nobody
+
+# For this to work you will also need host keys in /etc/ssh/ssh_known_hosts
+#RhostsRSAAuthentication no
+# similar for protocol version 2
+#HostbasedAuthentication no
+# Change to yes if you don't trust ~/.ssh/known_hosts for
+# RhostsRSAAuthentication and HostbasedAuthentication
+#IgnoreUserKnownHosts no
+# Don't read the user's ~/.rhosts and ~/.shosts files
+#IgnoreRhosts yes
+
+# To disable tunneled clear text passwords, change to no here!
+#PasswordAuthentication yes
+#PermitEmptyPasswords no
+
+# Change to no to disable s/key passwords
+ChallengeResponseAuthentication no
+
+# Kerberos options
+#KerberosAuthentication no
+#KerberosOrLocalPasswd yes
+#KerberosTicketCleanup yes
+#KerberosGetAFSToken no
+
+# GSSAPI options
+#GSSAPIAuthentication no
+#GSSAPICleanupCredentials yes
+
+# Set this to 'yes' to enable PAM authentication, account processing,
+# and session processing. If this is enabled, PAM authentication will
+# be allowed through the ChallengeResponseAuthentication and
+# PasswordAuthentication.  Depending on your PAM configuration,
+# PAM authentication via ChallengeResponseAuthentication may bypass
+# the setting of "PermitRootLogin without-password".
+# If you just want the PAM account and session checks to run without
+# PAM authentication, then enable this but set PasswordAuthentication
+# and ChallengeResponseAuthentication to 'no'.
+UsePAM yes
+
+#AllowAgentForwarding yes
+#AllowTcpForwarding yes
+#GatewayPorts no
+X11Forwarding yes
+#X11DisplayOffset 10
+#X11UseLocalhost yes
+#PermitTTY yes
+#PrintMotd yes
+#PrintLastLog yes
+#TCPKeepAlive yes
+#UseLogin no
+UsePrivilegeSeparation sandbox # Default for new installations.
+#PermitUserEnvironment no
+Compression no
+ClientAliveInterval 15
+ClientAliveCountMax 4
+#UseDNS yes
+#PidFile /var/run/sshd.pid
+#MaxStartups 10:30:100
+#PermitTunnel no
+#ChrootDirectory none
+#VersionAddendum none
+
+# no default banner path
+Banner /etc/ssh/sshd_oobm_banner
+
+# override default of no subsystems
+Subsystem	sftp	/usr/libexec/sftp-server
+
+# Example of overriding settings on a per-user basis
+#Match User anoncvs
+#	X11Forwarding no
+#	AllowTcpForwarding no
+#	PermitTTY no
+#	ForceCommand cvs server
+\end{verbatim}
+
+\section{Configuration: /etc/ssh/sshd\_oobm\_cmd}
+\label{section:appendix-ssh-sshdoobmcmd}
+\begin{verbatim}
+#!/usr/bin/env bash
+sudo mts-io-sysfs store ap1/serial-mode rs232
+/usr/bin/screen /dev/ttyAP1 9600
+\end{verbatim}
