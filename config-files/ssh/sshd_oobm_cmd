@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+sudo mts-io-sysfs store ap1/serial-mode rs232
+/usr/bin/screen /dev/ttyAP1 9600
+

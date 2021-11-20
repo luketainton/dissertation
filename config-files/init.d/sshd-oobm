@@ -1,0 +1,128 @@
+#! /bin/sh
+set -e
+
+PIDFILE=/var/run/sshd-oobm.pid
+CONFFILE=/etc/ssh/sshd_oobm_config
+
+# source function library
+. /etc/init.d/functions
+
+# /etc/init.d/sshd-oobm: start and stop the OpenBSD "secure shell" daemon for OOBM
+
+test -x /usr/sbin/sshd || exit 0
+( /usr/sbin/sshd -\? 2>&1 | grep -q OpenSSH ) 2>/dev/null || exit 0
+
+# /etc/default/ssh may set SYSCONFDIR and SSHD_OPTS
+if test -f /etc/default/ssh; then
+    . /etc/default/ssh
+fi
+
+[ -z "$SYSCONFDIR" ] && SYSCONFDIR=/etc/ssh
+mkdir -p $SYSCONFDIR
+
+HOST_KEY_RSA=$SYSCONFDIR/ssh_host_rsa_key
+HOST_KEY_DSA=$SYSCONFDIR/ssh_host_dsa_key
+HOST_KEY_ECDSA=$SYSCONFDIR/ssh_host_ecdsa_key
+HOST_KEY_ED25519=$SYSCONFDIR/ssh_host_ed25519_key
+
+check_for_no_start() {
+    # forget it if we're trying to start, and /etc/ssh/sshd_oobm_not_to_be_run exists
+    if [ -e $SYSCONFDIR/sshd_oobm_not_to_be_run ]; then
+	echo "OpenBSD Secure Shell server for OOBM not in use ($SYSCONFDIR/sshd_oobm_not_to_be_run)"
+	exit 0
+    fi
+}
+
+check_privsep_dir() {
+    # Create the PrivSep empty dir if necessary
+    if [ ! -d /var/run/sshd-oobm ]; then
+	mkdir /var/run/sshd-oobm
+	chmod 0755 /var/run/sshd-oobm
+    fi
+}
+
+check_config() {
+	/usr/sbin/sshd -t $SSHD_OPTS || exit 1
+}
+
+check_keys() {
+	# create keys if necessary
+	if [ ! -f $HOST_KEY_RSA ]; then
+		echo "  generating ssh RSA key..."
+		ssh-keygen -q -f $HOST_KEY_RSA -N '' -t rsa
+	fi
+	if [ ! -f $HOST_KEY_ECDSA ]; then
+		echo "  generating ssh ECDSA key..."
+		ssh-keygen -q -f $HOST_KEY_ECDSA -N '' -t ecdsa
+	fi
+	if [ ! -f $HOST_KEY_DSA ]; then
+		echo "  generating ssh DSA key..."
+		ssh-keygen -q -f $HOST_KEY_DSA -N '' -t dsa
+	fi
+	if [ ! -f $HOST_KEY_ED25519 ]; then
+		echo "  generating ssh ED25519 key..."
+		ssh-keygen -q -f $HOST_KEY_ED25519 -N '' -t ed25519
+	fi
+}
+
+export PATH="${PATH:+$PATH:}/usr/sbin:/sbin"
+
+case "$1" in
+  start)
+	check_for_no_start
+	echo "Starting OOBM server"
+	check_keys
+	check_privsep_dir
+	start-stop-daemon -S -p $PIDFILE --make-pidfile --startas /usr/sbin/sshd -- -f $CONFFILE $SSHD_OPTS
+        echo "done."
+	;;
+  stop)
+        echo -n "Stopping OOBM server"
+        pidno1=$(<$PIDFILE)
+        pidno=$((pidno1 + 1))
+        kill $pidno
+        echo "."
+	;;
+
+  reload|force-reload|restart)
+	check_for_no_start
+	check_keys
+	check_config
+        echo -n "Reloading OOBM server configuration"
+        /etc/init.d/sshd-oobm stop
+        /etc/init.d/sshd-oobm start
+        # start-stop-daemon -S -p $PIDFILE --make-pidfile --startas /usr/sbin/sshd -- -f $CONFFILE $SSHD_OPTS
+	echo "."
+	;;
+
+#  restart)
+#  	check_keys
+#	check_config
+#        echo -n "Restarting OpenBSD Secure Shell server: sshd"
+#	start-stop-daemon -K -p $PIDFILE --oknodo --startas /usr/sbin/sshd
+#	check_for_no_start
+#	check_privsep_dir
+#	sleep 2
+#       start-stop-daemon -S -p $PIDFILE --make-pidfile --startas /usr/sbin/sshd -- -f $CONFFILE $SSHD_OPTS
+#	echo "."
+#	;;
+
+  status)
+	#�status /usr/sbin/sshd
+        pidno1=$(<$PIDFILE)
+        pidno=$((pidno1 + 1))
+        if ps -p $pidno > /dev/null
+        then
+            echo "OOBM server ($pidno) is running"
+        else
+            echo "OOBM server is not running"
+        fi
+	exit $?
+  ;;
+
+  *)
+	echo "Usage: /etc/init.d/ssh-oobm {start|stop|status|reload|force-reload|restart}"
+	exit 1
+esac
+
+exit 0
